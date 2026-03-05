@@ -38,6 +38,7 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
         <div className="mb-4">
           <label htmlFor="customer" className="mb-2 block text-sm font-medium">
             Choose customer
+            <br /> customer ID: {customerId}
           </label>
           <div className="relative">
             <select
@@ -48,7 +49,7 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
               value={customerId}
               onChange={onChange}
             >
-              <option value="" key={"select-a-customer"} disabled>
+              <option value="" key={"select-a-customer"} disabled={customerId !== ""}>
                 Select a customer
               </option>
               {customers.map((customer) => (
