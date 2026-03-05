@@ -9,7 +9,9 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { Button } from '@/app/ui/button';
-import { updateInvoice } from '@/app/lib/actions';
+import { InvoiceState, updateInvoice } from '@/app/lib/actions';
+import { useActionState } from 'react';
+import { LabelError } from '../label-error';
 
 export default function EditInvoiceForm({
   invoice,
@@ -19,10 +21,12 @@ export default function EditInvoiceForm({
   customers: CustomerField[];
 }) {
   // pass id to the Server Action using JS bind. This will ensure that any values passed to the Server Action are encoded.
+  const initialState: InvoiceState = { errors: {}, message: null };
   const updateInvoiceWithId = updateInvoice.bind(null, invoice.id);
+  const [invoiceState, formAction, isPending] = useActionState(updateInvoiceWithId, initialState)
 
   return (
-    <form action={updateInvoiceWithId}>
+    <form action={formAction}>
       <div className="rounded-md bg-gray-50 p-4 md:p-6">
         {/* Customer Name */}
         <div className="mb-4">
@@ -47,6 +51,7 @@ export default function EditInvoiceForm({
             </select>
             <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
           </div>
+          <LabelError id="customer-error" errors={invoiceState.errors?.customerId} />
         </div>
 
         {/* Invoice Amount */}
@@ -68,6 +73,7 @@ export default function EditInvoiceForm({
               <CurrencyDollarIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
             </div>
           </div>
+          <LabelError id="amount-error" errors={invoiceState.errors?.amount} />
         </div>
 
         {/* Invoice Status */}
@@ -111,7 +117,9 @@ export default function EditInvoiceForm({
               </div>
             </div>
           </div>
+          <LabelError id="status-error" errors={invoiceState.errors?.status} />
         </fieldset>
+        <LabelError id="create-error" errors={invoiceState.message} />
       </div>
       <div className="mt-6 flex justify-end gap-4">
         <Link
@@ -120,7 +128,7 @@ export default function EditInvoiceForm({
         >
           Cancel
         </Link>
-        <Button type="submit">Edit Invoice</Button>
+        <Button type="submit" disabled={isPending} aria-busy={isPending} aria-live="polite">Edit Invoice</Button>
       </div>
     </form>
   );

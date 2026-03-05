@@ -1,3 +1,5 @@
+'use client'
+
 import { CustomerField } from '@/app/lib/definitions';
 import Link from 'next/link';
 import {
@@ -7,11 +9,30 @@ import {
   UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import { Button } from '@/app/ui/button';
-import { createInvoice } from '@/app/lib/actions';
+import { createInvoice, InvoiceState } from '@/app/lib/actions';
+import { useActionState, useState } from 'react';
+import { LabelError } from '@/app/ui/label-error';
 
 export default function Form({ customers }: { customers: CustomerField[] }) {
+  const initialState: InvoiceState = { message: null, errors: {} };
+  const [invoiceState, formAction, isPending] = useActionState(createInvoice, initialState);
+  const [amount, setAmount] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [status, setStatus] = useState('');
+
+  const onChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (name === 'amount') {
+      setAmount(value);
+    } else if (name === 'customerId') {
+      setCustomerId(value);
+    } else if (name === 'status') {
+      setStatus(value);
+    }
+  };
+
   return (
-    <form action={createInvoice}>
+    <form action={formAction}>
       <div className="rounded-md bg-gray-50 p-4 md:p-6">
         {/* Customer Name */}
         <div className="mb-4">
@@ -23,9 +44,11 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
               id="customer"
               name="customerId"
               className="peer block w-full cursor-pointer rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
-              defaultValue=""
+              aria-describedby="customer-error"
+              value={customerId}
+              onChange={onChange}
             >
-              <option value="" disabled>
+              <option value="" key={"select-a-customer"} disabled>
                 Select a customer
               </option>
               {customers.map((customer) => (
@@ -36,6 +59,7 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
             </select>
             <UserCircleIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500" />
           </div>
+          <LabelError id="customer-error" errors={invoiceState.errors?.customerId} />
         </div>
 
         {/* Invoice Amount */}
@@ -46,20 +70,24 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
           <div className="relative mt-2 rounded-md">
             <div className="relative">
               <input
+                aria-describedby="amount-error"
                 id="amount"
                 name="amount"
                 type="number"
                 step="0.01"
+                value={amount}
+                onChange={onChange}
                 placeholder="Enter USD amount"
                 className="peer block w-full rounded-md border border-gray-200 py-2 pl-10 text-sm outline-2 placeholder:text-gray-500"
               />
               <CurrencyDollarIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
             </div>
           </div>
+          <LabelError id="amount-error" errors={invoiceState.errors?.amount} />
         </div>
 
         {/* Invoice Status */}
-        <fieldset>
+        <fieldset aria-describedby="status-error">
           <legend className="mb-2 block text-sm font-medium">
             Set the invoice status
           </legend>
@@ -72,6 +100,8 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
                   type="radio"
                   value="pending"
                   className="h-4 w-4 cursor-pointer border-gray-300 bg-gray-100 text-gray-600 focus:ring-2"
+                  checked={status === 'pending'}
+                  onChange={onChange}
                 />
                 <label
                   htmlFor="pending"
@@ -87,6 +117,8 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
                   type="radio"
                   value="paid"
                   className="h-4 w-4 cursor-pointer border-gray-300 bg-gray-100 text-gray-600 focus:ring-2"
+                  checked={status === 'paid'}
+                  onChange={onChange}
                 />
                 <label
                   htmlFor="paid"
@@ -97,7 +129,9 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
               </div>
             </div>
           </div>
+          <LabelError id="status-error" errors={invoiceState.errors?.status} />
         </fieldset>
+        <LabelError id="create-error" errors={invoiceState.message} />
       </div>
       <div className="mt-6 flex justify-end gap-4">
         <Link
@@ -106,7 +140,10 @@ export default function Form({ customers }: { customers: CustomerField[] }) {
         >
           Cancel
         </Link>
-        <Button type="submit">Create Invoice</Button>
+        <Button type="submit" disabled={isPending} aria-busy={isPending}
+          aria-live="polite">
+          Create Invoice
+        </Button>
       </div>
     </form>
   );

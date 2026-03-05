@@ -10,22 +10,45 @@ const sql = postgres(process.env.DATABASE_URL!, { ssl: 'require' });
 
 const InvoiceFormSchema = z.object({
     id: z.string(),
-    customerId: z.string(),
+    customerId: z.string({ invalid_type_error: 'Please select a customer' }).uuid({ message: 'Please select a customer' }),
     amount: z
         .coerce.number()
-        .min(0, { message: 'Amount must be positive' })
+        .gt(0, { message: 'Amount must be positive' })
         .transform((value) => Math.round(value * 100)),
-    status: z.enum(['pending', 'paid']),
+    status: z.enum(['pending', 'paid'], { invalid_type_error: 'Please select a status' }),
     date: z.string(),
 });
 
+export type InvoiceState = {
+    errors?: {
+        customerId?: string[];
+        amount?: string[];
+        status?: string[];
+    };
+    message?: string | null;
+};
+
 const CreateInvoice = InvoiceFormSchema.omit({ id: true, date: true });
-export async function createInvoice(formData: FormData) {
-    const { customerId, amount, status } = CreateInvoice.parse({
-        customerId: formData.get('customerId'),
-        amount: formData.get('amount'),
-        status: formData.get('status'),
-    });
+export async function createInvoice(prevState: InvoiceState, formData: FormData) {
+
+    // Extract form data for potential return on validation error
+    const submittedData = {
+        customerId: formData.get('customerId') as string,
+        amount: formData.get('amount') as string,
+        status: formData.get('status') as string,
+    };
+
+    const validatedFields = CreateInvoice.safeParse(submittedData);
+
+    if (!validatedFields.success) {
+        console.error("create form validation:", validatedFields.error.flatten().fieldErrors);
+        return {
+            ...prevState,
+            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Missing Fields. Failed to Create Invoice.',
+        };
+    }
+    const { customerId, amount, status } = validatedFields.data;
     const date = new Date().toISOString().split('T')[0];
 
     try {
@@ -37,6 +60,7 @@ export async function createInvoice(formData: FormData) {
         // We'll also log the error to the console for now
         console.error(error);
         return {
+            ...prevState,
             message: 'Database Error: Failed to Create Invoice.',
         };
     }
@@ -51,12 +75,23 @@ export async function createInvoice(formData: FormData) {
 const UpdateInvoice = InvoiceFormSchema.omit({ id: true, date: true });
 
 
-export async function updateInvoice(id: string, formData: FormData) {
-    const { customerId, amount, status } = UpdateInvoice.parse({
+export async function updateInvoice(id: string, prevState: InvoiceState, formData: FormData) {
+    const validatedFields = UpdateInvoice.safeParse({
         customerId: formData.get('customerId'),
         amount: formData.get('amount'),
         status: formData.get('status'),
     });
+
+    if (!validatedFields.success) {
+        console.error("update form validation:", validatedFields.error.flatten().fieldErrors);
+        return {
+            ...prevState,
+            errors: validatedFields.error.flatten().fieldErrors,
+            message: 'Missing Fields. Failed to Update Invoice.',
+        };
+    }
+
+    const { customerId, amount, status } = validatedFields.data;
 
     try {
     await sql`
@@ -67,7 +102,10 @@ export async function updateInvoice(id: string, formData: FormData) {
     } catch (error) {
         // We'll also log the error to the console for now
         console.error(error);
-        return { message: 'Database Error: Failed to Update Invoice.' };
+        return {
+            ...prevState,
+            message: 'Database Error: Failed to Update Invoice.',
+        };
     }
 
     revalidatePath('/dashboard/invoices');
@@ -75,7 +113,6 @@ export async function updateInvoice(id: string, formData: FormData) {
 }
 
 export async function deleteInvoice(id: string) {
-    throw new Error('Failed to Delete Invoice');
     try {
     await sql`
         DELETE FROM invoices WHERE id = ${id}
@@ -83,7 +120,7 @@ export async function deleteInvoice(id: string) {
     } catch (error) {
         // We'll also log the error to the console for now
         console.error(error);
-        return { message: 'Database Error: Failed to Delete Invoice.' };
+        throw new Error('Failed to Delete Invoice');
     }
     revalidatePath('/dashboard/invoices');
 }
